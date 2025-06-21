@@ -3,7 +3,9 @@ services:
     build: .
     container_name: dftbopt_api_container
     ports:
-      - "1990:8000"
+      - "8000:8000"
     volumes:
-      - ./app:/app
+      # Map the local 'app' directory to '/code/app' inside the container
+      # to ensure hot-reloading works with the new structure.
+      - ./app:/code/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
