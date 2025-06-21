@@ -3,14 +3,14 @@ services:
     build: .
     container_name: dftbopt_api_container
     ports:
-      - "1990:8000"
+      - "8000:8000"
     volumes:
       - ./app:/code/app
-    command: uvicorn main:app --host 0.0.0.0 --port 8000 --reload
-    # Add these settings to increase resources for the container
-    shm_size: '4gb'  # Increase shared memory size
+    # DEFINITIVE FIX: The command must be 'app.main:app' to enable hot-reloading with the correct path.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    shm_size: '2gb'
     ulimits:
-      stack: -1    # Set unlimited stack size
+      stack: -1
       nofile:
         soft: 65536
         hard: 65536
