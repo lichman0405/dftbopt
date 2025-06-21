@@ -4,13 +4,19 @@
 # Date: 2025-06-21
 # Version: 0.1.0
 
+import os
+import shutil
+import uuid
 import base64
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
 
 from app.schemas.optimization import OptimizationResponseSchema
 from app.services import dftb_service
+from app.utils.logger import console
 
 router = APIRouter()
+
+WORKSPACE_BASE = os.path.join("app", "workspace")
 
 @router.post(
     "/",
@@ -32,16 +38,18 @@ async def run_dftb_optimization_and_get_results(
     
     if not input_file.filename or not input_file.filename.lower().endswith('.cif'):
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid file type, must be .cif.")
+
+    request_id = str(uuid.uuid4())
+    workspace_dir = os.path.join(WORKSPACE_BASE, request_id)
+    os.makedirs(workspace_dir)
     
     try:
-        # The service layer now returns the parsed data and the path to the output file
-        parsed_data, output_cif_path, request_id = await dftb_service.perform_optimization(
-            input_file=input_file, fmax=fmax, method=method
+        # Pass the created workspace_dir to the service layer
+        parsed_data, output_cif_path = await dftb_service.perform_optimization(
+            input_file=input_file, fmax=fmax, method=method, workspace_dir=workspace_dir
         )
-        if isinstance(output_cif_path, tuple):
-            output_cif_path = output_cif_path[0] 
         
-        # Read the content of the final CIF file
+        # Read the content of the final CIF file before the workspace is cleaned up
         with open(output_cif_path, 'rb') as f:
             cif_content_bytes = f.read()
             
@@ -63,7 +71,13 @@ async def run_dftb_optimization_and_get_results(
         return response
         
     except Exception as e:
+        console.exception(f"An error occurred during request {request_id}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"An unexpected error occurred: {str(e)}"
         )
+    finally:
+        # The cleanup now happens here, after the response has been prepared.
+        if os.path.exists(workspace_dir):
+            shutil.rmtree(workspace_dir)
+            console.info(f"Cleaned up workspace directory: {workspace_dir}")
