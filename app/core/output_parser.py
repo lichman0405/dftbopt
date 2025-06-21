@@ -19,7 +19,6 @@ def parse_detailed_out(file_path: str) -> Dict[str, Any]:
     Returns:
         Dict[str, Any]: A structured dictionary with the parsed data.
     """
-    # Define the structure for the final JSON output
     results: Dict[str, Any] = {
         'summary': {},
         'convergence_info': {},
@@ -45,12 +44,10 @@ def parse_detailed_out(file_path: str) -> Dict[str, Any]:
         else:
             final_block = content
 
-        
-        # Convergence Info
+
         scc_converged = re.search(r"SCC converged", final_block)
         results['convergence_info']['scc_converged'] = bool(scc_converged)
 
-        # Electronic Properties
         fermi_match = re.search(r"Fermi level:\s*([-\d\.E\+]+)\s*H\s*([-\d\.E\+]+)\s*eV", final_block)
         if fermi_match:
             results['electronic_properties']['fermi_level_eV'] = float(fermi_match.group(2))
@@ -67,7 +64,7 @@ def parse_detailed_out(file_path: str) -> Dict[str, Any]:
                 "z": float(dipole_match.group(3)),
             }
 
-        # Energies (both eV and Hartree)
+
         energy_pattern = re.compile(r"^\s*(.+?):\s*([-\d\.E\+]+)\s*H\s*([-\d\.E\+]+)\s*eV", re.MULTILINE)
         energy_key_map = {
             "Band energy": "band_energy", "Band free energy (E-TS)": "band_free_energy",

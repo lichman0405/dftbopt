@@ -11,12 +11,10 @@ from app.utils.logger import console
 
 def generate_hsd_content(method: str, fmax: float, input_gen_file: str) -> str:
     """Dynamically generate the content of the dftb_in.hsd file."""
-    
-    # Check if the method is valid
+
     if method not in ["GFN1-xTB", "GFN2-xTB"]:
         raise ValueError("Method must be 'GFN1-xTB' or 'GFN2-xTB'")
 
-    # Use f-string to template the HSD input
     hsd_template = f"""
 Geometry = GenFormat {{
   <<< "{input_gen_file}"
@@ -71,19 +69,15 @@ def run_dftb(workspace_dir: str, input_gen_file: str, fmax: float, method: str) 
             f.write(hsd_content)
         console.success(f"Generated dftb_in.hsd for {method} with fmax={fmax} eV/Angstrom.")
 
-        # Execute the DFTB+ command
         console.info("Starting DFTB+ process...")
-        # Use subprocess.run, setting the working directory to workspace_dir
-        # This ensures that DFTB+ looks for input files and generates output files in the correct directory
         result = subprocess.run(
             ['dftb+'],
             cwd=workspace_dir,
             capture_output=True,
             text=True,
-            check=False  # Set to False, manually check the return code
+            check=False  
         )
 
-        # Check if the process executed successfully
         if result.returncode != 0:
             console.error("DFTB+ process failed!")
             console.error(f"Return Code: {result.returncode}")
@@ -91,7 +85,7 @@ def run_dftb(workspace_dir: str, input_gen_file: str, fmax: float, method: str) 
             return False
 
         console.success("DFTB+ process completed successfully.")
-        console.info(f"DFTB+ stdout:\n{result.stdout[-500:]}") # Print the last 500 lines of output
+        console.info(f"DFTB+ stdout:\n{result.stdout[-500:]}") 
         return True
 
     except Exception as e:

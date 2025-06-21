@@ -38,7 +38,6 @@ class OptimizationResponseSchema(BaseModel):
     request_id: str
     input_parameters: Dict[str, Any]
     detailed_results: DetailedResultsSchema
-    # This field will hold the Base64 encoded string of the final CIF file.
     optimized_structure_cif_b64: str = Field(
         ..., 
         description="The optimized structure in CIF format, encoded as a Base64 string."

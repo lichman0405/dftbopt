@@ -4,7 +4,6 @@
 # Date: 2025-06-21
 # Version: 0.1.0
 
-# app/api/routes/optimization.py (Final version with improved error handling)
 
 import os
 import shutil
