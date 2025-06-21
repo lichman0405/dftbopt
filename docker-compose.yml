@@ -6,9 +6,8 @@ services:
       - "8000:8000"
     volumes:
       - ./app:/code/app
-    # DEFINITIVE FIX: The command must be 'app.main:app' to enable hot-reloading with the correct path.
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    shm_size: '4gb'
+    shm_size: '16gb'
     ulimits:
       stack: -1
       nofile:
