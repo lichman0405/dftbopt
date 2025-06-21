@@ -4,11 +4,14 @@
 # Date: 2025-06-21
 # Version: 0.1.0
 
+# app/api/routes/optimization.py (Final version with improved error handling)
+
 import os
 import shutil
 import uuid
 import base64
 from fastapi import APIRouter, UploadFile, File, Form, HTTPException, status
+from fastapi.responses import JSONResponse
 
 from app.schemas.optimization import OptimizationResponseSchema
 from app.services import dftb_service
@@ -20,8 +23,27 @@ WORKSPACE_BASE = os.path.join("app", "workspace")
 
 @router.post(
     "/",
-    response_model=OptimizationResponseSchema,
-    summary="Run DFTB+ Geometry Optimization and Get All Results"
+    responses={
+        200: {
+            "description": "Optimization was successful.",
+            "model": OptimizationResponseSchema,
+        },
+        422: {
+            "description": "Calculation failed due to input structure or resource issues.",
+            "content": {
+                "application/json": {
+                    "example": {"detail": "DFTB+ calculation failed for the provided structure..."}
+                }
+            },
+        },
+        500: {
+            "description": "An unexpected internal server error occurred.",
+        }
+    },
+    summary="Run DFTB+ Geometry Optimization and Get All Results",
+    description="Submits a CIF file for optimization. On success, returns a single JSON "
+                "response containing analysis results and the Base64-encoded "
+                "optimized structure file."
 )
 async def run_dftb_optimization_and_get_results(
     input_file: UploadFile = File(..., description="Input structure file in CIF format."),
@@ -29,35 +51,36 @@ async def run_dftb_optimization_and_get_results(
     method: str = Form("GFN1-xTB", description="GFN-xTB method (GFN1-xTB or GFN2-xTB).")
 ):
     """
-    Receives a CIF file, performs optimization, and returns a single JSON
-    response containing both the analysis results and the Base64-encoded 
-    optimized structure file.
+    Receives a CIF file and parameters, performs a DFTB+ geometry optimization,
+    and returns a single, self-contained JSON response.
     """
     if method not in ["GFN1-xTB", "GFN2-xTB"]:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid method.")
-    
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Invalid method '{method}'. Please choose 'GFN1-xTB' or 'GFN2-xTB'."
+        )
+
     if not input_file.filename or not input_file.filename.lower().endswith('.cif'):
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid file type, must be .cif.")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid file type. Please upload a .cif file."
+        )
 
     request_id = str(uuid.uuid4())
     workspace_dir = os.path.join(WORKSPACE_BASE, request_id)
     os.makedirs(workspace_dir)
-    
+
     try:
-        # Pass the created workspace_dir to the service layer
         parsed_data, output_cif_path = await dftb_service.perform_optimization(
             input_file=input_file, fmax=fmax, method=method, workspace_dir=workspace_dir
         )
-        
-        # Read the content of the final CIF file before the workspace is cleaned up
         with open(output_cif_path, 'rb') as f:
             cif_content_bytes = f.read()
-            
-        # Encode the file content into a Base64 string
+
         cif_b64_string = base64.b64encode(cif_content_bytes).decode('utf-8')
-        
-        # Construct the final response object
-        response = {
+
+        # Construct the successful response object.
+        response_data = {
             "status": "success",
             "request_id": request_id,
             "input_parameters": {
@@ -68,16 +91,23 @@ async def run_dftb_optimization_and_get_results(
             "detailed_results": parsed_data,
             "optimized_structure_cif_b64": cif_b64_string,
         }
-        return response
-        
+        return JSONResponse(status_code=status.HTTP_200_OK, content=response_data)
+
+    except RuntimeError as e:
+        console.error(f"DFTB+ runtime error for request {request_id}: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"DFTB+ calculation failed for the provided structure. This is likely due to "
+                   f"insufficient resources (memory) for a large structure, or an unstable initial geometry. "
+                   f"Internal error: {str(e)}"
+        )
     except Exception as e:
-        console.exception(f"An error occurred during request {request_id}")
+        console.exception(f"An unexpected error occurred for request {request_id}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"An unexpected error occurred: {str(e)}"
+            detail=f"An unexpected server error occurred: {str(e)}"
         )
     finally:
-        # The cleanup now happens here, after the response has been prepared.
         if os.path.exists(workspace_dir):
             shutil.rmtree(workspace_dir)
             console.info(f"Cleaned up workspace directory: {workspace_dir}")
