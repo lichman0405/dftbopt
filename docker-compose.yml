@@ -1,0 +1,13 @@
+# docker-compose.yml
+
+version: '3.8'
+
+services:
+  dftbopt_api:
+    build: .
+    container_name: dftbopt_api_container
+    ports:
+      - "1990:8000"
+    volumes:
+      - ./app:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
